@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>chat 0.0</title>
+  <!-- Tailwind CSS（保持不变） -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 图标库（保持不变） -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- ✨ 关键修改：替换Live2D依赖为稳定库 ✨ -->
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.9/dist/pixi.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/index.min.js"></script>
+  
+  <!-- Tailwind主题配置（保持不变） -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#FF6B9B', secondary: '#7B61FF', 
+            accent: '#4CD2FF', light: '#FFF5F8', dark: '#2A2A48'
+          },
+          fontFamily: { anime: ['"Comic Sans MS"', '"Bubblegum Sans"', 'cursive'] },
+          animation: {
+            'bounce-slow': 'bounce 3s infinite',
+            'fade-in': 'fadeIn 0.5s ease-in-out',
+            'slide-up': 'slideUp 0.3s ease-out'
+          },
+          keyframes: {
+            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            slideUp: { '0%': { transform: 'translateY(10px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- 自定义工具类（保持不变） -->
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto { content-visibility: auto; }
+      .text-shadow { text-shadow: 1px 1px 3px rgba(0,0,0,0.2); }
+      .chat-bubble-left { border-radius: 18px 18px 18px 0; }
+      .chat-bubble-right { border-radius: 18px 18px 0 18px; }
+      .live2d-container { width: 100%; height: 100%; min-height: 400px; }
+    }
+  </style>
+  
+  <!-- 基础样式（保持不变，除滚动条） -->
+  <style>
+    body {
+      background-color: #FFF5F8;
+      background-image: 
+        radial-gradient(#FF6B9B15 1px, transparent 1px),
+        radial-gradient(#7B61FF15 1px, transparent 1px);
+      background-size: 50px 50px;
+      background-position: 0 0, 25px 25px;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: #FF6B9B80; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #FF6B9B; }
+    #messageInput::-webkit-scrollbar { display: none; }
+    #messageInput { scrollbar-width: none; -ms-overflow-style: none; }
+  </style>
+</head>
+
+<body class="font-anime text-dark min-h-screen flex flex-col">
+  <!-- 顶部导航 -->
+  <header class="bg-gradient-to-r from-primary to-secondary text-white shadow-xl rounded-b-3xl">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <i class="fa fa-comments text-3xl animate-bounce-slow drop-shadow"></i>
+        <h1 class="text-2xl md:text-3xl font-bold text-shadow tracking-wide">test</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <button id="historyBtn" class="hover:text-light transition-colors duration-300 flex items-center gap-1">
+          <i class="fa fa-history"></i>
+          <span class="hidden md:inline ml-1">历史</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="flex-1 container mx-auto px-4 py-6 flex flex-col md:flex-row gap-8">
+    <!-- 左侧聊天区 -->
+    <section class="flex-1 flex flex-col h-[calc(100vh-8rem)] order-1 md:order-1">
+      <div id="chatContainer" class="flex-1 bg-white rounded-3xl shadow-xl p-6 overflow-y-auto mb-4 border border-light">
+        <!-- 欢迎消息 -->
+        <div class="text-center mb-8 text-gray-400 text-sm">
+          <span class="bg-light px-4 py-1 rounded-full shadow" id="welcomeTime">--:--</span>
+        </div>
+        <!-- 角色消息（马卡龙左气泡，纯粉色） -->
+        <div class="flex items-start mb-6 animate-fade-in">
+          <img src="./photo/test0.jpg" alt="test0" class="w-12 h-12 rounded-full object-cover mr-4 shadow-lg border-2 border-primary">
+          <div class="max-w-[80%]">
+            <div class="bg-pink-200 chat-bubble-left p-5 shadow-md border border-pink-300">
+              <p class="text-dark font-semibold">嗨～ 我是test0！很高兴认识你！😊 今天想聊点什么呀？</p>
+            </div>
+            <span class="text-xs text-gray-400 ml-2">14:31</span>
+          </div>
+        </div>
+        <!-- 用户消息（马卡龙右气泡，纯蓝色） -->
+      </div>
+      <!-- 输入区域 -->
+      <div class="bg-white rounded-3xl shadow-xl p-5 border border-light">
+        <div class="mb-3 flex space-x-2 overflow-x-auto pb-2">
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">😊</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">😍</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">😂</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">👍</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">🎉</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">😢</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">😡</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">🤔</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">🤩</button>
+          <button class="text-2xl hover:scale-125 transition-transform duration-200">✨</button>
+        </div>
+        <div class="flex items-end gap-2">
+          <textarea id="messageInput" placeholder="输入消息... 和她聊聊天吧～" 
+            class="flex-1 border border-accent rounded-full px-5 py-4 focus:outline-none focus:border-primary transition-colors resize-none shadow"
+            rows="1"></textarea>
+          <button id="sendBtn" class="bg-gradient-to-r from-primary to-secondary text-white rounded-full p-4 hover:shadow-2xl transition-all duration-300 flex items-center justify-center text-xl">
+            <i class="fa fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 正在输入指示器 -->
+      <div id="typingIndicator" class="hidden text-left mb-4">
+        <span class="bg-pink-100 text-pink-500 px-4 py-2 rounded-full shadow animate-pulse">test0 正在思考...</span>
+      </div>
+    </section>
+
+    <!-- 右侧Live2D展示区 -->
+    <aside class="w-full md:w-72 lg:w-80 bg-primary rounded-3xl shadow-2xl p-6 h-fit md:h-[calc(100vh-12rem)] overflow-hidden order-2 md:order-2">
+      <h2 class="text-lg font-bold mb-4 text-white flex items-center drop-shadow">
+        <i class="fa fa-star mr-2 text-yellow-400"></i>test0
+      </h2>
+      <!-- Live2D画布容器 -->
+      <div class="w-full h-[calc(100%-4rem)] bg-white rounded-2xl overflow-hidden relative shadow-lg flex items-center justify-center">
+        <canvas id="live2dCanvas" class="w-full h-full"></canvas>
+      </div>
+    </aside>
+  </main>
+
+  <!-- 历史记录模态框 -->
+  <div id="historyModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-3xl w-full max-w-md max-h-[80vh] overflow-y-auto p-8 shadow-2xl border border-light">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-primary">聊天历史</h3>
+        <button id="closeHistoryBtn" class="text-gray-500 hover:text-dark">
+          <i class="fa fa-times text-xl"></i>
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div class="p-4 border border-gray-200 rounded-xl hover:bg-light cursor-pointer transition-colors shadow">
+          <div class="flex justify-between">
+            <div class="flex items-center">
+              <!-- 头像换成和聊天区一样 -->
+              <img src="./photo/test0.jpg" alt="test0" class="w-8 h-8 rounded-full mr-2 border-2 border-primary">
+              <span class="font-bold">与 test0 的对话</span>
+            </div>
+            <span class="text-xs text-gray-400">今天</span>
+          </div>
+          <!-- 内容换成 test0 最后回复用户的内容 -->
+          <p class="text-sm text-gray-500 mt-1 truncate" id="historyLastReply">--</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✨ 关键修改：Live2D初始化代码 ✨ -->
+  <script>
+    // DOM元素（保持不变）
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const chatContainer = document.getElementById('chatContainer');
+    const typingIndicator = document.getElementById('typingIndicator');
+    const historyBtn = document.getElementById('historyBtn');
+    const historyModal = document.getElementById('historyModal');
+    const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+
+    // 输入框高度自适应（保持不变）
+    messageInput.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight > 100 ? 100 : this.scrollHeight) + 'px';
+    });
+
+    let isFirstMessage = true; // 是否首次发送消息
+
+    // 发送消息（保持不变，新增Live2D互动）
+    function sendMessage() {
+      const message = messageInput.value.trim();
+      if (!message) return;
+
+      // 获取当前时间
+      const now = new Date();
+      const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      // 用户消息气泡
+      const userMessageHTML = `
+        <div class="flex items-start justify-end mb-6 animate-fade-in">
+          <div class="max-w-[80%] text-right">
+            <div class="bg-blue-200 text-dark chat-bubble-right p-5 shadow-md border border-blue-300">
+              <p>${message}</p>
+            </div>
+            <span class="text-xs text-gray-400 mr-2">${timeString}</span>
+          </div>
+        </div>
+      `;
+      chatContainer.insertAdjacentHTML('beforeend', userMessageHTML);
+      messageInput.value = '';
+      messageInput.style.height = 'auto';
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      // 触发Live2D点头
+      window.live2dModel?.startMotion('tap_body', 1);
+
+      typingIndicator.classList.remove('hidden');
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      setTimeout(() => {
+        typingIndicator.classList.add('hidden');
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        const replies = [
+          "哇！这个想法好棒呢～ (≧∇≦)/",
+          "我明白了！让我想想怎么回答你～",
+          "是吗？那太有趣了！能不能多告诉我一些？",
+          "哈哈，你真有意思～ 我喜欢和你聊天！",
+          "这个问题有点难呢... 让我好好想想～"
+        ];
+        const randomReply = replies[Math.floor(Math.random() * replies.length)];
+        lastTest0Reply = randomReply; // 记录最后回复
+
+        const replyTime = new Date();
+        const replyTimeString = `${replyTime.getHours()}:${replyTime.getMinutes().toString().padStart(2, '0')}`;
+
+        const characterReplyHTML = `
+          <div class="flex items-start mb-6 animate-fade-in">
+            <img src="./photo/test0.jpg" alt="test0" class="w-12 h-12 rounded-full object-cover mr-4 shadow-lg border-2 border-primary">
+            <div class="max-w-[80%]">
+              <div class="bg-pink-200 chat-bubble-left p-5 shadow-md border border-pink-300">
+                <p class="text-dark font-semibold">${randomReply}</p>
+              </div>
+              <span class="text-xs text-gray-400 ml-2">${replyTimeString}</span>
+            </div>
+          </div>
+        `;
+        chatContainer.insertAdjacentHTML('beforeend', characterReplyHTML);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        window.live2dModel?.startMotion('speak', 1);
+
+        // 更新历史记录内容
+        const historyLastReply = document.getElementById('historyLastReply');
+        if (historyLastReply) {
+          historyLastReply.textContent = lastTest0Reply;
+        }
+      }, 1200);
+    }
+    sendBtn.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // 历史记录模态框（保持不变）
+    historyBtn.addEventListener('click', () => historyModal.classList.remove('hidden'));
+    closeHistoryBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
+    historyModal.addEventListener('click', (e) => {
+      if (e.target === historyModal) historyModal.classList.add('hidden');
+    });
+
+    // 表情按钮（保持不变）
+    document.querySelectorAll('.text-2xl').forEach(emojiBtn => {
+      emojiBtn.addEventListener('click', () => {
+        messageInput.value += emojiBtn.textContent;
+        messageInput.focus();
+        messageInput.dispatchEvent(new Event('input'));
+      });
+    });
+
+    // ✨ 修复Live2D初始化（核心） ✨
+    function initLive2D() {
+      const canvas = document.getElementById('live2dCanvas');
+      canvas.width = canvas.clientWidth || 300;
+      canvas.height = canvas.clientHeight || 400;
+
+      const app = new PIXI.Application({
+        view: canvas,
+        width: canvas.clientWidth,
+        height: canvas.clientHeight,
+        transparent: true
+      });
+
+      // 加载本地 hibiki 模型
+      PIXI.Loader.shared
+        .add('model', './models/hibiki/runtime/hibiki.model3.json')
+        .load((err, resources) => {
+          if (err) return console.error('Live2D加载失败:', err);
+          const model = new PIXI.live2d.Live2DModel(resources.model);
+          window.live2dModel = model;
+          app.stage.addChild(model);
+
+          // 模型定位（居中+适配）
+          model.scale.set(0.28);
+          model.x = app.screen.width * 0.5;
+          model.y = app.screen.height * 0.7;
+          model.pivot.x = model.width * 0.5;
+          model.pivot.y = model.height * 0.8;
+
+          model.startMotion('idle', 1);
+
+          // 眼睛跟随光标
+          canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            const y = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+            model.internalModel.motionManager.setValue('PARAM_EYE_BALL_X', x);
+            model.internalModel.motionManager.setValue('PARAM_EYE_BALL_Y', y);
+          });
+
+          // 点击模型互动
+          canvas.addEventListener('click', () => {
+            model.startMotion('tap_body', 1);
+            model.startMotion('blink', 1);
+          });
+
+          window.addEventListener('resize', () => {
+            app.renderer.resize(canvas.clientWidth, canvas.clientHeight);
+            model.x = canvas.clientWidth * 0.5;
+          });
+        });
+    }
+    window.addEventListener('load', initLive2D);
+
+    // 获取进入网页的瞬时时间
+    const enterTime = new Date();
+    const enterTimeString = `${enterTime.getHours()}:${enterTime.getMinutes().toString().padStart(2, '0')}`;
+
+    // 设置欢迎消息时间
+    document.addEventListener('DOMContentLoaded', () => {
+      const welcomeTimeSpan = document.getElementById('welcomeTime');
+      if (welcomeTimeSpan) {
+        welcomeTimeSpan.textContent = enterTimeString;
+      }
+    });
+  </script>
+</body>
+</html>
